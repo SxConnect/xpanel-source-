@@ -313,7 +313,7 @@ Proprietário - © 2026 SX Connect. Todos os direitos reservados.
 
 - 📦 [Repositório de Instalação](https://github.com/SxConnect/install-xpanel)
 - 🐳 [Imagens Docker (GHCR)](https://github.com/SxConnect?tab=packages)
-- 📚 [Documentação](https://docs.xpanel.sxconnect.com.br)
+- 📚 [Documentação Completa](./docs/README.md) - Toda a documentação técnica do projeto
 
 ---
 
