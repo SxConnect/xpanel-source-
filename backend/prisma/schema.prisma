@@ -1,0 +1,361 @@
+// XPanel Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USERS & AUTH
+// ============================================================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          UserRole  @default(USER)
+  tier          UserTier  @default(FREE)
+  
+  // Limites (para multi-usuário)
+  maxDomains    Int       @default(0) // 0 = ilimitado
+  maxDatabases  Int       @default(0)
+  maxContainers Int       @default(0)
+  maxEmails     Int       @default(0)
+  diskQuotaMB   Int       @default(0)
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  
+  // Relações
+  domains       Domain[]
+  databases     Database[]
+  containers    Container[]
+  emails        EmailAccount[]
+  backups       Backup[]
+  auditLogs     AuditLog[]
+  
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  RESELLER
+  USER
+}
+
+enum UserTier {
+  FREE
+  PREMIUM
+}
+
+// ============================================================================
+// HOSTING - DOMAINS & SITES
+// ============================================================================
+
+model Domain {
+  id            String      @id @default(uuid())
+  domain        String      @unique
+  type          DomainType  @default(SITE)
+  
+  // Site config
+  phpVersion    String?     @default("8.3")
+  documentRoot  String?     @default("/var/www/html")
+  
+  // SSL
+  sslEnabled    Boolean     @default(false)
+  sslProvider   String?     @default("letsencrypt")
+  sslExpiresAt  DateTime?
+  
+  // Container (se type = CONTAINER)
+  containerId   String?
+  containerPort Int?
+  
+  // Status
+  status        DomainStatus @default(ACTIVE)
+  
+  // Owner
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relações
+  dnsRecords    DnsRecord[]
+  
+  @@map("domains")
+}
+
+enum DomainType {
+  SITE      // Site tradicional (PHP/HTML)
+  CONTAINER // Aponta para container Docker
+}
+
+enum DomainStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+}
+
+// ============================================================================
+// DNS
+// ============================================================================
+
+model DnsRecord {
+  id        String      @id @default(uuid())
+  domainId  String
+  domain    Domain      @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  
+  type      DnsRecordType
+  name      String      // @ para root, ou subdomain
+  value     String
+  ttl       Int         @default(3600)
+  priority  Int?        // Para MX e SRV
+  
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  
+  @@map("dns_records")
+}
+
+enum DnsRecordType {
+  A
+  AAAA
+  CNAME
+  MX
+  TXT
+  SPF
+  DKIM
+  DMARC
+  CAA
+  SRV
+}
+
+// ============================================================================
+// DATABASES
+// ============================================================================
+
+model Database {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  type        DatabaseType @default(MYSQL)
+  
+  // Credenciais
+  username    String
+  password    String
+  
+  // Conexão
+  host        String       @default("localhost")
+  port        Int          @default(3306)
+  
+  // Tamanho
+  sizeMB      Float        @default(0)
+  
+  // Owner
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  @@map("databases")
+}
+
+enum DatabaseType {
+  MYSQL
+  POSTGRESQL
+}
+
+// ============================================================================
+// DOCKER
+// ============================================================================
+
+model Container {
+  id            String          @id @default(uuid())
+  
+  // Docker info
+  dockerId      String          @unique
+  name          String
+  image         String
+  status        ContainerStatus @default(CREATED)
+  
+  // App info (se instalado via catálogo)
+  appId         String?
+  appName       String?
+  appCategory   String?
+  
+  // Recursos
+  cpuLimit      Float?
+  memoryLimitMB Int?
+  
+  // Portas
+  ports         Json?           // [{internal: 80, external: 8080}]
+  
+  // Volumes
+  volumes       Json?           // ["/host/path:/container/path"]
+  
+  // Environment
+  env           Json?           // {KEY: "value"}
+  
+  // Stats
+  cpuUsage      Float           @default(0)
+  memoryUsageMB Float           @default(0)
+  networkRxMB   Float           @default(0)
+  networkTxMB   Float           @default(0)
+  
+  // Owner
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  startedAt     DateTime?
+  stoppedAt     DateTime?
+  
+  @@map("containers")
+}
+
+enum ContainerStatus {
+  CREATED
+  RUNNING
+  PAUSED
+  STOPPED
+  EXITED
+  DEAD
+}
+
+// ============================================================================
+// EMAIL
+// ============================================================================
+
+model EmailAccount {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  password    String
+  
+  // Quota
+  quotaMB     Int       @default(1024)
+  usedMB      Float     @default(0)
+  
+  // Forwarding
+  forwardTo   String?
+  
+  // Status
+  enabled     Boolean   @default(true)
+  
+  // Owner
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("email_accounts")
+}
+
+// ============================================================================
+// BACKUP
+// ============================================================================
+
+model Backup {
+  id          String       @id @default(uuid())
+  
+  type        BackupType
+  name        String
+  
+  // Conteúdo
+  includes    Json         // ["domains", "databases", "containers"]
+  
+  // Destino
+  destination BackupDest   @default(LOCAL)
+  path        String
+  
+  // Tamanho
+  sizeMB      Float        @default(0)
+  
+  // Status
+  status      BackupStatus @default(PENDING)
+  error       String?
+  
+  // Schedule
+  schedule    String?      // cron expression
+  
+  // Owner
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+  
+  @@map("backups")
+}
+
+enum BackupType {
+  MANUAL
+  SCHEDULED
+}
+
+enum BackupDest {
+  LOCAL
+  S3
+  B2
+  SFTP
+}
+
+enum BackupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+// ============================================================================
+// SECURITY & AUDIT
+// ============================================================================
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action      String    // "domain.create", "container.start", etc
+  resource    String?   // ID do recurso afetado
+  details     Json?     // Detalhes adicionais
+  
+  ip          String?
+  userAgent   String?
+  
+  createdAt   DateTime  @default(now())
+  
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SYSTEM
+// ============================================================================
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_settings")
+}
