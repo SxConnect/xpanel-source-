@@ -9,14 +9,14 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copiar arquivos de dependências
-COPY package*.json ./
+COPY package.json ./
 COPY tsconfig*.json ./
 COPY vite.config.ts ./
 COPY postcss.config.js ./
 COPY tailwind.config.js ./
 
 # Instalar dependências
-RUN npm ci && \
+RUN npm install && \
     npm cache clean --force
 
 # Copiar código fonte
