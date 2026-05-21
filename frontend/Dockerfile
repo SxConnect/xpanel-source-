@@ -1,19 +1,35 @@
 # Build stage
 FROM node:20-alpine AS build
 
+# Install build dependencies
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 
-# Copy package file
-COPY package.json ./
+# Copy package files
+COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies with verbose logging
+RUN echo "=== Installing dependencies ===" && \
+    npm ci --legacy-peer-deps --verbose || npm install --legacy-peer-deps --verbose
 
-# Copy source
+# Copy all source files
 COPY . .
 
-# Build
-RUN npm run build
+# Debug: List files
+RUN echo "=== Files in /app ===" && ls -la && \
+    echo "=== Files in /app/src ===" && ls -la src/ && \
+    echo "=== Checking tsconfig ===" && cat tsconfig.json
+
+# Build with verbose output
+RUN echo "=== Starting build ===" && \
+    NODE_ENV=production npm run build --verbose
+
+# Verify build output
+RUN echo "=== Build complete, checking dist ===" && \
+    ls -la dist/ && \
+    echo "=== Dist contents ===" && \
+    find dist/ -type f
 
 # Production stage
 FROM nginx:alpine
