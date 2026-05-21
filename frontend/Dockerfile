@@ -13,8 +13,8 @@ COPY tsconfig*.json ./
 COPY *.config.* ./
 COPY index.html ./
 
-# Instalar dependências
-RUN npm install
+# Instalar TODAS as dependências (incluindo dev para o build)
+RUN npm install --include=dev
 
 # Copiar código fonte
 COPY src ./src
