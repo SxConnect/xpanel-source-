@@ -7,12 +7,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar package files
-COPY package.json ./
+# Copiar todos os arquivos de configuração
+COPY package*.json ./
 COPY tsconfig*.json ./
-COPY vite.config.ts ./
-COPY postcss.config.js ./
-COPY tailwind.config.js ./
+COPY *.config.* ./
+COPY index.html ./
 
 # Instalar dependências
 RUN npm install
@@ -20,7 +19,6 @@ RUN npm install
 # Copiar código fonte
 COPY src ./src
 COPY public ./public
-COPY index.html ./
 
 # Build da aplicação
 RUN npm run build
