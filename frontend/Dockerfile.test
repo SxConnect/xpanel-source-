@@ -1,0 +1,31 @@
+# Dockerfile de teste - single stage para debug
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy everything
+COPY . .
+
+# Show what we have
+RUN echo "=== Files copied ===" && ls -la
+
+# Install dependencies
+RUN echo "=== Installing dependencies ===" && \
+    npm install --legacy-peer-deps
+
+# Try to build with maximum verbosity
+RUN echo "=== Attempting build ===" && \
+    npm run build || echo "Build failed with exit code $?"
+
+# Check if dist was created
+RUN if [ -d "dist" ]; then \
+        echo "✓ dist folder created"; \
+        ls -la dist/; \
+    else \
+        echo "✗ dist folder NOT created"; \
+        echo "Current directory contents:"; \
+        ls -la; \
+    fi
+
+# Keep container running for inspection
+CMD ["sh"]
