@@ -6,11 +6,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Aumentar memória do Node.js
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # Copiar tudo
 COPY . .
 
-# Instalar dependências e buildar
-RUN npm install --legacy-peer-deps && npm run build
+# Instalar dependências
+RUN npm install --legacy-peer-deps --loglevel verbose
+
+# Buildar aplicação
+RUN npm run build
 
 # ============================================
 # Stage 2: Nginx
