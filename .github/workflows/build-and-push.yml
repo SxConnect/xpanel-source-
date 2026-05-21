@@ -74,8 +74,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # Temporariamente desabilitado até corrigir erros de build
-    if: false
 
     steps:
       - name: Checkout repository
