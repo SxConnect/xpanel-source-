@@ -12,8 +12,32 @@ RUN npm install --legacy-peer-deps
 # Copy source code
 COPY . .
 
+# Verify critical files exist
+RUN echo "=== Verifying files ===" && \
+    ls -la && \
+    test -f "vite.config.ts" && echo "✓ vite.config.ts exists" || (echo "✗ vite.config.ts missing" && exit 1) && \
+    test -f "tsconfig.json" && echo "✓ tsconfig.json exists" || (echo "✗ tsconfig.json missing" && exit 1) && \
+    test -f "index.html" && echo "✓ index.html exists" || (echo "✗ index.html missing" && exit 1) && \
+    test -d "src" && echo "✓ src/ exists" || (echo "✗ src/ missing" && exit 1) && \
+    test -f "src/main.tsx" && echo "✓ src/main.tsx exists" || (echo "✗ src/main.tsx missing" && exit 1)
+
 # Build application (skip type checking)
-RUN npm run build -- --mode production 2>&1 | tee /tmp/build.log || (cat /tmp/build.log && exit 1)
+RUN set -x && \
+    npm run build 2>&1 | tee /tmp/build.log; \
+    BUILD_EXIT=$?; \
+    echo "Build exit code: $BUILD_EXIT"; \
+    cat /tmp/build.log; \
+    if [ $BUILD_EXIT -ne 0 ]; then \
+        echo "=== BUILD FAILED ==="; \
+        exit 1; \
+    fi; \
+    if [ ! -d "dist" ]; then \
+        echo "=== ERROR: dist folder not created ==="; \
+        ls -la; \
+        exit 1; \
+    fi; \
+    echo "=== Build successful, dist folder exists ==="; \
+    ls -la dist/
 
 # Production stage
 FROM nginx:alpine
