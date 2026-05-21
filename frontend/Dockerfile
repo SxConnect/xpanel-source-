@@ -1,42 +1,36 @@
 # Build stage
-FROM node:20-alpine AS build
-
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
+# Copy package files first
+COPY package*.json ./
 
-# Install dependencies with verbose logging
-RUN echo "=== Installing dependencies ===" && \
-    npm ci --legacy-peer-deps --verbose || npm install --legacy-peer-deps --verbose
+# Install dependencies
+RUN npm install --legacy-peer-deps
 
-# Copy all source files
+# Copy source code
 COPY . .
 
-# Debug: List files
-RUN echo "=== Files in /app ===" && ls -la && \
-    echo "=== Files in /app/src ===" && ls -la src/ && \
-    echo "=== Checking tsconfig ===" && cat tsconfig.json
-
-# Build with verbose output
-RUN echo "=== Starting build ===" && \
-    NODE_ENV=production npm run build --verbose
-
-# Verify build output
-RUN echo "=== Build complete, checking dist ===" && \
-    ls -la dist/ && \
-    echo "=== Dist contents ===" && \
-    find dist/ -type f
+# Build application
+RUN npm run build
 
 # Production stage
 FROM nginx:alpine
 
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copy built files
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-RUN echo 'server{listen 80;root /usr/share/nginx/html;index index.html;location /{try_files $uri /index.html;}}' > /etc/nginx/conf.d/default.conf
+# Configure nginx
+RUN echo 'server { \
+    listen 80; \
+    server_name _; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
